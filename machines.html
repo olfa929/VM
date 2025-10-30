@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machines - Machine Vibration Monitoring</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <img src="img.png" alt="SUPCOM Logo" class="header-logo">
+        </div>
+
+        <div class="header-content">
+            <h1>Machine Vibration Monitoring</h1>
+            <p>Advanced predictive maintenance for industrial equipment</p>
+        </div>
+    </header>
+    <button id="logoutBtn" class="btn logout-btn top-right">Logout</button>
+    <main>
+        <section class="machines-list">
+            <h2>Machine List</h2>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search machines...">
+            </div>
+            <div class="filter-container">
+                <select id="deviceNameFilter">
+                    <option value="">All Device Names</option>
+                </select>
+                <select id="deviceEuiFilter">
+                    <option value="">All Device EUIs</option>
+                </select>
+                <select id="joinEuiFilter">
+                    <option value="">All Join EUIs</option>
+                </select>
+                <select id="deviceProfileFilter">
+                    <option value="">All Device Profiles</option>
+                </select>
+            </div>
+            <button id="addMachineBtn" class="btn">Add New Machine</button>
+            <table id="machinesTable">
+                <thead>
+                    <tr>
+                        <th>Device Name</th>
+                        <th>Device EUI</th>
+                        <th>Join EUI</th>
+                        <th>Device Profile</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Machine data will be populated here -->
+                </tbody>
+            </table>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2023 Supcom Machine Monitoring. All rights reserved.</p>
+    </footer>
+    <script src="script.js"></script>
+    <script>
+        // Add logout functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.removeItem('loggedIn');
+                localStorage.removeItem('userRole');
+                window.location.href = 'index.html';
+            });
+        });
+    </script>
+</body>
+</html>

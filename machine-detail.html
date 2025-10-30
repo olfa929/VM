@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Machine Detail - Machine Vibration Monitoring</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+      #status {
+        padding: 8px 12px;
+        margin: 10px 0;
+        border-radius: 6px;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      }
+      #status.ok { background: #e6ffed; color: #03543f; border: 1px solid #a7f3d0; }
+      #status.warn { background: #fffbea; color: #723b13; border: 1px solid #fce588; }
+      #status.err { background: #fde8e8; color: #9b1c1c; border: 1px solid #f8b4b4; }
+      #lastValue { font-family: monospace; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <img src="img.png" alt="SUPCOM Logo" class="header-logo">
+        </div>
+
+        <div class="header-content">
+            <h1>Machine Vibration Monitoring</h1>
+            <p>Advanced predictive maintenance for industrial equipment</p>
+        </div>
+    </header>
+    <button id="logoutBtn" class="btn logout-btn top-right">Logout</button>
+    <main>
+        <section class="machine-detail">
+            <div class="back-button-container">
+                <button id="backBtn" class="btn back-btn">← Back to Machines</button>
+            </div>
+            <h2>Machine Details</h2>
+            <div class="detail-container">
+                <div class="machine-info">
+                    <h3>Device Information</h3>
+                    <div class="info-item">
+                        <label>Device Name:</label>
+                        <span id="deviceName"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Device EUI:</label>
+                        <span id="deviceEui"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Join EUI:</label>
+                        <span id="joinEui"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Device Profile:</label>
+                        <span id="deviceProfile"></span>
+                    </div>
+                </div>
+                <div class="vibration-graph">
+                    <h3>Vibration Data</h3>
+                    <div id="status" class="warn">Waiting for data…</div>
+                    <canvas id="vibrationChart" width="800" height="400"></canvas>
+                    <div id="lastValue"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2023 Supcom Machine Monitoring. All rights reserved.</p>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Determine API base: if opened from file:// use 127.0.0.1
+        const host = (location.hostname && location.hostname !== "" && location.hostname !== "localhost")
+            ? location.hostname
+            : "127.0.0.1";
+        const API_BASE = `http://${host}:8765`;
+
+        const statusEl = document.getElementById('status');
+        const lastValueEl = document.getElementById('lastValue');
+
+        const vibrationData = [];
+        let chart;
+
+        function ensureChart() {
+            const ctx = document.getElementById('vibrationChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Vibration (mm/s)', data: [], fill: true, tension: 0.3, pointRadius: 2 }] },
+                options: {
+                    responsive: false,
+                    animation: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Time' } },
+                        y: { beginAtZero: true, title: { display: true, text: 'Vibration (mm/s)' },
+                            ticks: { stepSize: 0.1, callback: (v) => Number(v).toFixed(1) } }
+                    },
+                    plugins: { tooltip: { callbacks: { label: (ctx) => ` ${ctx.parsed.y.toFixed(2)} mm/s` } } }
+                }
+            });
+        }
+
+        function pushPointToChart(valueNumber) {
+            const t = new Date().toLocaleTimeString();
+            vibrationData.push({ time: t, value: valueNumber });
+            if (vibrationData.length > 60) vibrationData.shift();
+            chart.data.labels = vibrationData.map(d => d.time);
+            chart.data.datasets[0].data = vibrationData.map(d => d.value);
+            chart.update();
+            lastValueEl.textContent = `Last received: ${valueNumber.toFixed(2)} mm/s @ ${t}`;
+        }
+
+        async function pollLatest() {
+            try {
+                const r = await fetch(`${API_BASE}/latest`, { cache: 'no-store' });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const { value } = await r.json();
+
+                if (value === null || value === undefined) {
+                    statusEl.className = 'warn';
+                    statusEl.textContent = `Connected to ${API_BASE}, but no data yet (value=null). Send an uplink.`;
+                    return;
+                }
+
+                const v = Number(value);
+                if (Number.isNaN(v)) {
+                    statusEl.className = 'err';
+                    statusEl.textContent = `Got non-numeric value from ${API_BASE}/latest: ${JSON.stringify(value)}`;
+                    return;
+                }
+
+                // Success
+                statusEl.className = 'ok';
+                statusEl.textContent = `Receiving data from ${API_BASE}/latest`;
+                pushPointToChart(v);
+            } catch (e) {
+                statusEl.className = 'err';
+                statusEl.textContent = `Cannot reach ${API_BASE}/latest — ${e.message}. Is cpde.py running?`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            ensureChart();
+            setInterval(pollLatest, 1000);
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const machineId = urlParams.get('id');
+            if (machineId) {
+                const machines = JSON.parse(localStorage.getItem('machines')) || [];
+                const machine = machines.find(m => m.id == machineId);
+                if (machine) {
+                    document.getElementById('deviceName').textContent = machine.deviceName || '';
+                    document.getElementById('deviceEui').textContent = machine.deviceEui || '';
+                    document.getElementById('joinEui').textContent = machine.joinEui || '';
+                    document.getElementById('deviceProfile').textContent = machine.deviceProfile || '';
+                }
+            }
+
+            document.getElementById('backBtn').addEventListener('click', () => {
+                window.location.href = 'machines.html';
+            });
+
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                localStorage.removeItem('loggedIn');
+                localStorage.removeItem('userRole');
+                window.location.href = 'index.html';
+            });
+        });
+    </script>
+</body>
+</html>
